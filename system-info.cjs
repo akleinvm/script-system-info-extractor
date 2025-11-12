@@ -2,8 +2,6 @@ const os = require("os");
 const si = require("systeminformation");
 const QRCode = require("qrcode");
 const path = require("path");
-const { encode } = require("@msgpack/msgpack");
-const brotli = require("brotli");
 const { exec } = require("child_process");
 
 function determineStorageDriveType(diskLayout) {
@@ -70,8 +68,32 @@ function detectMouse(usbDevices, bluetoothDevices) {
   return "No";
 }
 
+function detectMonitors(graphics) {
+  if (!graphics || !graphics.displays || graphics.displays.length === 0) {
+    return ["Unknown"];
+  }
+
+  return graphics.displays.map((display) => {
+    let connectionType = display.connection || "Unknown";
+
+    // Clean up connection type names
+    connectionType = connectionType
+      .replace("Display Port", "DisplayPort")
+      .replace("DP", "DisplayPort")
+      .replace("HD15", "VGA")
+      .replace("LVDS", "Built-in");
+
+    // Determine if built-in or external
+    if (display.builtin || connectionType === "Built-in") {
+      return "Built-in";
+    } else {
+      return `${connectionType} - External`;
+    }
+  });
+}
+
 async function getAllInfo() {
-  const [systemInfo, chassisInfo, osInfo, cpu, mem, diskLayout, usbDevices, bluetoothDevices] = await Promise.all([
+  const [systemInfo, chassisInfo, osInfo, cpu, mem, diskLayout, usbDevices, bluetoothDevices, graphics] = await Promise.all([
     si.system(),
     si.chassis(),
     si.osInfo(),
@@ -79,7 +101,8 @@ async function getAllInfo() {
     si.mem(),
     si.diskLayout(),
     si.usb(),
-    si.bluetoothDevices()
+    si.bluetoothDevices(),
+    si.graphics()
   ]);
 
   return {
@@ -95,7 +118,8 @@ async function getAllInfo() {
     StorageSize: calculateTotalStorageGB(diskLayout),
     Webcam: detectWebcam(usbDevices),
     Keyboard: detectKeyboard(usbDevices, bluetoothDevices),
-    Mouse: detectMouse(usbDevices, bluetoothDevices)
+    Mouse: detectMouse(usbDevices, bluetoothDevices),
+    Monitors: detectMonitors(graphics)
   };
 }
 
@@ -106,23 +130,11 @@ getAllInfo()
     const tempPath = path.join(os.tmpdir(), `system-info-qr-${Date.now()}.png`);
 
     try {
-      // Step 1: Encode data with MessagePack (binary format, more compact than JSON)
-      const msgpackData = encode(info);
-
-      // Step 2: Compress with Brotli (better compression than gzip)
-      const compressed = Buffer.from(brotli.compress(msgpackData, {
-        mode: 0, // generic mode
-        quality: 11, // maximum compression (0-11)
-      }));
-
-      // Step 3: Encode to base64 for QR code compatibility
-      const base64Data = compressed.toString('base64');
+      // Encode to base64 for QR code compatibility
+      const base64Data = Buffer.from(jsonData).toString('base64');
 
       console.log(`Original JSON size: ${jsonData.length} bytes`);
-      console.log(`MessagePack size: ${msgpackData.length} bytes (${((1 - msgpackData.length / jsonData.length) * 100).toFixed(1)}% reduction)`);
-      console.log(`After Brotli compression: ${compressed.length} bytes`);
       console.log(`After base64 encoding: ${base64Data.length} bytes`);
-      console.log(`Total size reduction vs original: ${((1 - base64Data.length / jsonData.length) * 100).toFixed(1)}%`);
 
       await QRCode.toFile(tempPath, base64Data, {
         errorCorrectionLevel: 'L',
@@ -132,7 +144,7 @@ getAllInfo()
 
       console.log(`QR code generated in temp directory: ${tempPath}`);
       console.log('Opening QR code for scanning...');
-      console.log('Note: Data is base64 encoded, Brotli compressed, and MessagePack encoded.');
+      console.log('Note: Data is base64 encoded JSON.');
 
       // Determine the command based on the operating system
       let openCommand;
