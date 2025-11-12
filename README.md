@@ -131,12 +131,7 @@ The `pkg` tool (v5.8.1) supports up to Node.js 16. Node 18+ versions are not yet
 
 ### Note on Bytecode Warnings
 
-You may see warnings about failed bytecode compilation for native modules:
-```
-Warning Failed to make bytecode node16-arm64 for file .../brotli/build/encode.js
-```
-
-These warnings are normal and do not affect the functionality of the executables.
+You may see warnings about failed bytecode compilation during the build process. These warnings are normal and do not affect the functionality of the executables.
 
 ## Output
 
@@ -171,7 +166,6 @@ Note: Data is base64 encoded JSON.
 ### Runtime Dependencies
 - **[systeminformation](https://www.npmjs.com/package/systeminformation)** - Cross-platform system information library
 - **[qrcode](https://www.npmjs.com/package/qrcode)** - QR code generator
-- **[pako](https://www.npmjs.com/package/pako)** - Compression library
 
 ### Development Dependencies
 - **[pkg](https://www.npmjs.com/package/pkg)** - Package Node.js projects into executables
